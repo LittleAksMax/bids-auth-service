@@ -9,13 +9,7 @@ import (
 	"time"
 )
 
-const (
-	ModeDevelopment = "development"
-	ModeProduction  = "production"
-)
-
 type Config struct {
-	Mode       string
 	DBHost     string
 	DBPort     string
 	DBUser     string

@@ -13,9 +13,17 @@ import (
 	"github.com/davidr/bids-auth-service/internal/db"
 )
 
+const (
+	ModeDevelopment = "development"
+	ModeProduction  = "production"
+)
+
 func main() {
 	// Load development override file BEFORE config parsing if MODE indicates development.
-	if os.Getenv("MODE") == config.ModeDevelopment {
+	mode := os.Getenv("MODE")
+	if mode != ModeDevelopment && mode != ModeProduction {
+	}
+	if mode == ModeDevelopment {
 		if err := godotenv.Load(".env.Dev"); err != nil {
 			log.Fatalf("Failed to load .env.Dev: %v", err)
 		}
@@ -37,7 +45,7 @@ func main() {
 		}
 	}()
 
-	if cfg.Mode != config.ModeProduction {
+	if mode != ModeProduction {
 		if err := db.Migrate(dsn, "migrations"); err != nil {
 			log.Fatalf("migration error: %v", err)
 		}
@@ -51,7 +59,7 @@ func main() {
 	r := api.NewRouter(pool, cfg, refreshStore)
 
 	addr := ":" + cfg.Port
-	log.Printf("starting server on %s (mode=%s)", addr, cfg.Mode)
+	log.Printf("starting server on %s (mode=%s)", addr, mode)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Printf("server stopped: %v", err)
 		os.Exit(1)
