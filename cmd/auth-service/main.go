@@ -8,15 +8,16 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/davidr/bids-auth-service/internal/api"
+	"github.com/davidr/bids-auth-service/internal/cache"
 	"github.com/davidr/bids-auth-service/internal/config"
 	"github.com/davidr/bids-auth-service/internal/db"
 )
 
 func main() {
-	// Load .env.Dev explicitly if present and MODE=development
+	// Load development override file BEFORE config parsing if MODE indicates development.
 	if os.Getenv("MODE") == config.ModeDevelopment {
 		if err := godotenv.Load(".env.Dev"); err != nil {
-			log.Fatalf("Error loading .env.Dev file")
+			log.Fatalf("Failed to load .env.Dev: %v", err)
 		}
 	}
 
@@ -25,20 +26,29 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	dbConnStr := db.DSN(cfg)
-	pool, err := db.Connect(dbConnStr)
+	dsn := cfg.DSN()
+	pool, err := db.Connect(dsn)
 	if err != nil {
 		log.Fatalf("db connect error: %v", err)
 	}
-	defer pool.Close()
+	defer func() {
+		if err := pool.Close(); err != nil {
+			log.Printf("db close error: %v", err)
+		}
+	}()
 
 	if cfg.Mode != config.ModeProduction {
-		if err := db.Migrate(dbConnStr, "migrations"); err != nil {
+		if err := db.Migrate(dsn, "migrations"); err != nil {
 			log.Fatalf("migration error: %v", err)
 		}
 	}
 
-	r := api.NewRouter(pool)
+	refreshStore, err := cache.NewRedisRefreshStore(cfg)
+	if err != nil {
+		log.Fatalf("refresh store error: %v", err)
+	}
+
+	r := api.NewRouter(pool, cfg, refreshStore)
 
 	addr := ":" + cfg.Port
 	log.Printf("starting server on %s (mode=%s)", addr, cfg.Mode)

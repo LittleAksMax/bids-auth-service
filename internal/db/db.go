@@ -11,13 +11,12 @@ import (
 )
 
 // Connect opens a database/sql DB backed by pgx, returns a pooled *sql.DB
-func Connect(url string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", url)
+func Connect(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
 	}
-
-	// Reasonable pool settings
+	// Pool settings
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(30 * time.Minute)
@@ -31,14 +30,14 @@ func Connect(url string) (*sql.DB, error) {
 }
 
 // Migrate runs goose migrations in the given folder.
-func Migrate(databaseURL, migrationsDir string) error {
-	db, err := sql.Open("pgx", databaseURL)
+func Migrate(dsn, migrationsDir string) error {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	goose.SetBaseFS(nil) // using real filesystem
+	goose.SetBaseFS(nil)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}

@@ -5,28 +5,21 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/davidr/bids-auth-service/internal/cache"
+	"github.com/davidr/bids-auth-service/internal/config"
+	"github.com/davidr/bids-auth-service/internal/token"
 )
 
-// NewRouter constructs the main API router.
-func NewRouter(db *sql.DB) http.Handler {
+// NewRouter constructs the main API router by wiring middleware and routes defined elsewhere.
+func NewRouter(db *sql.DB, cfg *config.Config, store cache.RefreshTokenStore) http.Handler {
 	r := chi.NewRouter()
 
-	// Health endpoint
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		if err := db.PingContext(r.Context()); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = w.Write([]byte("db not ready"))
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	RegisterMiddleware(r)
 
-	// Placeholder auth routes group
-	r.Route("/auth", func(r chi.Router) {
-		// r.Post("/login", loginHandler)
-		// r.Post("/register", registerHandler)
-	})
+	mgr := token.NewManager(cfg.AccessTokenSecret, cfg.RefreshTokenSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL, store)
+	controller := NewAuthController(db, mgr, cfg)
+	RegisterRoutes(r, controller)
 
 	return r
 }
