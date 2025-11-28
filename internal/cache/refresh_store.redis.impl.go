@@ -84,5 +84,10 @@ func (s *RedisRefreshStore) Delete(ctx context.Context, token string) error {
 	return s.client.Del(ctx, key).Err()
 }
 
+// HealthCheck checks if the Redis connection is healthy.
+func (s *RedisRefreshStore) HealthCheck(ctx context.Context) error {
+	return s.client.Ping(ctx).Err()
+}
+
 // Client exposes underlying redis client (optional future use).
 func (s *RedisRefreshStore) Client() *redis.Client { return s.client }

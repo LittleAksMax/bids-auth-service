@@ -1,20 +1,17 @@
 package api
 
 import (
-	"database/sql"
-
-	"github.com/davidr/bids-auth-service/internal/config"
-	"github.com/davidr/bids-auth-service/internal/token"
+	"github.com/davidr/bids-auth-service/internal/service"
 )
 
 // AuthController houses dependencies for auth/token endpoints.
 type AuthController struct {
-	DB  *sql.DB
-	Mgr *token.Manager
-	Cfg *config.Config
+	AuthService service.AuthService
 }
 
 // NewAuthController constructs an AuthController.
-func NewAuthController(db *sql.DB, mgr *token.Manager, cfg *config.Config) *AuthController {
-	return &AuthController{DB: db, Mgr: mgr, Cfg: cfg}
+func NewAuthController(authService service.AuthService) *AuthController {
+	return &AuthController{
+		AuthService: authService,
+	}
 }

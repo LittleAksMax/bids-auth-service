@@ -96,3 +96,28 @@ func (m *Manager) ValidateAccess(access string) (*Claims, error) {
 	}
 	return claims, nil
 }
+
+// GenerateTokenPair creates both a refresh token and access token for a user.
+func (m *Manager) GenerateTokenPair(ctx context.Context, userID string) (refreshToken, accessToken string, err error) {
+	refreshToken, err = m.GenerateRefreshToken(ctx, userID)
+	if err != nil {
+		return "", "", err
+	}
+	accessToken, err = m.newAccessToken(userID)
+	if err != nil {
+		// Clean up the refresh token if access token generation fails
+		_ = m.store.Delete(ctx, refreshToken)
+		return "", "", err
+	}
+	return refreshToken, accessToken, nil
+}
+
+// InvalidateRefreshToken removes a refresh token from the store.
+func (m *Manager) InvalidateRefreshToken(ctx context.Context, refreshToken string) error {
+	return m.store.Delete(ctx, refreshToken)
+}
+
+// GetRefreshTokenInfo retrieves the userID and expiration for a refresh token.
+func (m *Manager) GetRefreshTokenInfo(ctx context.Context, refreshToken string) (userID string, expiresAt time.Time, err error) {
+	return m.store.Get(ctx, refreshToken)
+}

@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/url"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/davidr/bids-auth-service/internal/config"
 )
 
@@ -17,4 +19,16 @@ func DSN(cfg *config.Config) string {
 		net.JoinHostPort(cfg.DBHost, cfg.DBPort),
 		cfg.DBName,
 	)
+}
+
+// HashPassword generates a bcrypt hash of the password.
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MaxCost)
+	return string(bytes), err
+}
+
+// CheckPassword verifies if the provided password matches the hash.
+func CheckPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

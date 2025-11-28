@@ -1,8 +1,10 @@
 package api
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/davidr/bids-auth-service/internal/service"
 )
 
 // apiResponse reused for controller JSON responses.
@@ -12,70 +14,104 @@ type apiResponse struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-// Health handler implementation.
-func (c *AuthController) Health(w http.ResponseWriter, r *http.Request) {
-	if err := c.DB.PingContext(r.Context()); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, apiResponse{Success: false, Error: "db not ready"})
+// Register handler creates a new user account.
+func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
+	body := GetRequestBody[RegisterRequest](r)
+	if body == nil {
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
-	writeJSON(w, http.StatusOK, apiResponse{Success: true, Data: "ok"})
+
+	// Call service layer
+	userID, tokens, err := c.AuthService.Register(r.Context(), body.Username, body.Email, body.Password)
+	if err != nil {
+		if errors.Is(err, service.ErrUserExists) {
+			writeJSON(w, http.StatusConflict, apiResponse{Success: false, Error: "username or email already exists"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to register user"})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, apiResponse{
+		Success: true,
+		Data: map[string]string{
+			"user_id":       userID,
+			"refresh_token": tokens.RefreshToken,
+			"access_token":  tokens.AccessToken,
+		},
+	})
 }
 
-// GenerateRefresh handler implementation.
-func (c *AuthController) GenerateRefresh(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		UserID string `json:"user_id"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.UserID == "" {
-		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: "user_id required"})
+// Login handler authenticates a user and returns both tokens.
+func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
+	body := GetRequestBody[LoginRequest](r)
+	if body == nil {
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
-	refresh, err := c.Mgr.GenerateRefreshToken(r.Context(), body.UserID)
+
+	// Call service layer
+	tokens, err := c.AuthService.Login(r.Context(), body.Username, body.Password)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: err.Error()})
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			writeJSON(w, http.StatusUnauthorized, apiResponse{Success: false, Error: "invalid credentials"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "login failed"})
 		return
 	}
-	writeJSON(w, http.StatusCreated, apiResponse{Success: true, Data: map[string]string{"refresh_token": refresh}})
+
+	writeJSON(w, http.StatusOK, apiResponse{
+		Success: true,
+		Data: map[string]string{
+			"refresh_token": tokens.RefreshToken,
+			"access_token":  tokens.AccessToken,
+		},
+	})
 }
 
-// ExchangeRefresh handler implementation.
-func (c *AuthController) ExchangeRefresh(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Refresh string `json:"refresh_token"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.Refresh == "" {
-		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: "refresh_token required"})
+// Logout handler invalidates the refresh token.
+func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
+	body := GetRequestBody[LogoutRequest](r)
+	if body == nil {
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
-	access, err := c.Mgr.ExchangeRefresh(r.Context(), body.Refresh)
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, apiResponse{Success: false, Error: err.Error()})
+
+	// Call service layer
+	if err := c.AuthService.Logout(r.Context(), body.RefreshToken); err != nil {
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to logout"})
 		return
 	}
-	writeJSON(w, http.StatusOK, apiResponse{Success: true, Data: map[string]string{"access_token": access}})
+
+	writeJSON(w, http.StatusOK, apiResponse{Success: true, Data: "logged out"})
 }
 
-// ValidateAccess handler implementation.
-func (c *AuthController) ValidateAccess(w http.ResponseWriter, r *http.Request) {
-	apiKey := r.Header.Get("X-API-Key")
-	if apiKey == "" || apiKey != c.Cfg.ValidationAPIKey {
-		writeJSON(w, http.StatusForbidden, apiResponse{Success: false, Error: "invalid api key"})
+// Refresh handler exchanges a refresh token for a new token pair.
+func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
+	body := GetRequestBody[RefreshRequest](r)
+	if body == nil {
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
-	var body struct {
-		Access string `json:"access_token"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.Access == "" {
-		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: "access_token required"})
-		return
-	}
-	claims, err := c.Mgr.ValidateAccess(body.Access)
+
+	// Call service layer
+	tokens, err := c.AuthService.RefreshTokens(r.Context(), body.RefreshToken)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, apiResponse{Success: false, Error: err.Error()})
+		if errors.Is(err, service.ErrInvalidRefresh) || errors.Is(err, service.ErrRefreshExpired) {
+			writeJSON(w, http.StatusUnauthorized, apiResponse{Success: false, Error: "invalid or expired refresh token"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, apiResponse{Success: false, Error: "failed to refresh tokens"})
 		return
 	}
-	writeJSON(w, http.StatusOK, apiResponse{Success: true, Data: claims})
+
+	writeJSON(w, http.StatusOK, apiResponse{
+		Success: true,
+		Data: map[string]string{
+			"refresh_token": tokens.RefreshToken,
+			"access_token":  tokens.AccessToken,
+		},
+	})
 }
