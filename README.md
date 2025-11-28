@@ -128,8 +128,12 @@ Invalidates a specific refresh token in the cache. Requires `X-Api-Key` header. 
 - **Database**: PostgreSQL for user accounts with bcrypt password hashing
 - **Migrations**: Goose for schema versioning
 
+
+
 ## Notes
 - Access tokens are short-lived JWTs (default: 15 minutes)
 - Refresh tokens are long-lived random tokens stored in Redis (default: 7 days)
 - Passwords are hashed using bcrypt
 - In development mode, migrations run automatically at startup
+- All validation (required fields, email format, password strength) handled by middleware
+- Input normalization (trimming, lowercasing emails) handled at service layer
