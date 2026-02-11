@@ -1,6 +1,6 @@
 # Auth Service
 
-Minimal Go auth service using Chi router, Postgres (pgx), Redis cache, JWT tokens, and goose migrations.
+Minimal Go auth service using Chi router, Postgres (pgx), JWT tokens, and goose migrations.
 
 ## Environment Variables
 
@@ -13,10 +13,6 @@ DATABASE_PORT=5432
 DATABASE_USER=authuser
 DATABASE_PASSWORD=DevPass123!
 DATABASE_NAME=auth_db
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
 ACCESS_TOKEN_SECRET=your-secret-key-change-me
 REFRESH_TOKEN_SECRET=your-refresh-secret-key-change-me
 ACCESS_TOKEN_TTL=15m        # e.g., 15m, 1h
@@ -93,7 +89,7 @@ curl -X POST http://localhost:8082/auth/logout \
     "refresh_token": "<your_refresh_token>"
   }'
 ```
-Invalidates the refresh token in the cache.
+Invalidates the refresh token in the database.
 
 ### Validate Access Token (API Key Protected)
 ```bash
@@ -115,7 +111,7 @@ curl -X POST http://localhost:8082/tokens/invalidate \
     "refresh_token": "<refresh_token_to_invalidate>"
   }'
 ```
-Invalidates a specific refresh token in the cache. Requires `X-Api-Key` header. Useful for admin operations or security purposes.
+Invalidates a specific refresh token in the database. Requires `X-Api-Key` header. Useful for admin operations or security purposes.
 
 ## Architecture
 
@@ -124,7 +120,6 @@ Invalidates a specific refresh token in the cache. Requires `X-Api-Key` header. 
   - Auth endpoints in `internal/api/auth_controller.impl.go`
   - Token management endpoints in `internal/api/tokens_controller.impl.go`
 - **Token Management**: JWT access tokens and random refresh tokens managed by `internal/token/manager.go`
-- **Refresh Token Store**: Redis-backed cache implementing `internal/cache/RefreshTokenStore` interface
 - **Database**: PostgreSQL for user accounts with bcrypt password hashing
 - **Migrations**: Goose for schema versioning
 
@@ -132,7 +127,7 @@ Invalidates a specific refresh token in the cache. Requires `X-Api-Key` header. 
 
 ## Notes
 - Access tokens are short-lived JWTs (default: 15 minutes)
-- Refresh tokens are long-lived random tokens stored in Redis (default: 7 days)
+- Refresh tokens are long-lived random tokens stored in the database (default: 7 days)
 - Passwords are hashed using bcrypt
 - In development mode, migrations run automatically at startup
 - All validation (required fields, email format, password strength) handled by middleware

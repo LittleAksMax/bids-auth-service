@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
-	"github.com/davidr/bids-auth-service/internal/cache"
+	"github.com/google/uuid"
 )
 
 // Claims represents access token payload.
 type Claims struct {
-	UserID string `json:"user_id"`
+	Name string `json:"name"`
+	Role string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -24,17 +24,26 @@ type Manager struct {
 	refreshSecret []byte
 	accessTTL     time.Duration
 	refreshTTL    time.Duration
-	store         cache.RefreshTokenStore
+	issuer        string
+	audience      string
 }
 
-func NewManager(accessSecret, refreshSecret string, accessTTL, refreshTTL time.Duration, store cache.RefreshTokenStore) *Manager {
+func NewManager(accessSecret, refreshSecret, issuer, audience string, accessTTL, refreshTTL time.Duration) *Manager {
 	return &Manager{
 		accessSecret:  []byte(accessSecret),
 		refreshSecret: []byte(refreshSecret),
 		accessTTL:     accessTTL,
 		refreshTTL:    refreshTTL,
-		store:         store,
+		issuer:        issuer,
+		audience:      audience,
 	}
+}
+
+// RefreshTokenStore defines the methods that a refresh token store must implement.
+type RefreshTokenStore interface {
+	Save(ctx context.Context, token, userID string, expires time.Time) error
+	Get(ctx context.Context, token string) (userID string, expiresAt time.Time, err error)
+	Delete(ctx context.Context, token string) error
 }
 
 // GenerateRefreshToken issues a random refresh token and stores it.
@@ -55,7 +64,8 @@ func (m *Manager) GenerateRefreshToken(ctx context.Context, userID string) (stri
 }
 
 // ExchangeRefresh validates the refresh token then returns a new signed access token.
-func (m *Manager) ExchangeRefresh(ctx context.Context, refresh string) (string, error) {
+// You must provide name and role for the user.
+func (m *Manager) ExchangeRefresh(ctx context.Context, refresh, name, role string) (string, error) {
 	uid, exp, err := m.store.Get(ctx, refresh)
 	if err != nil {
 		return "", err
@@ -64,13 +74,18 @@ func (m *Manager) ExchangeRefresh(ctx context.Context, refresh string) (string, 
 		_ = m.store.Delete(ctx, refresh)
 		return "", errors.New("refresh expired")
 	}
-	return m.newAccessToken(uid)
+	return m.newAccessToken(uid, name, role)
 }
 
-func (m *Manager) newAccessToken(userID string) (string, error) {
+func (m *Manager) newAccessToken(userID, name, role string) (string, error) {
 	claims := Claims{
-		UserID: userID,
+		Name: name,
+		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.NewString(),
+			Subject:   userID,
+			Issuer:    m.issuer,
+			Audience:  jwt.ClaimStrings{m.audience},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -98,14 +113,13 @@ func (m *Manager) ValidateAccess(access string) (*Claims, error) {
 }
 
 // GenerateTokenPair creates both a refresh token and access token for a user.
-func (m *Manager) GenerateTokenPair(ctx context.Context, userID string) (refreshToken, accessToken string, err error) {
+func (m *Manager) GenerateTokenPair(ctx context.Context, userID, name, role string) (refreshToken, accessToken string, err error) {
 	refreshToken, err = m.GenerateRefreshToken(ctx, userID)
 	if err != nil {
 		return "", "", err
 	}
-	accessToken, err = m.newAccessToken(userID)
+	accessToken, err = m.newAccessToken(userID, name, role)
 	if err != nil {
-		// Clean up the refresh token if access token generation fails
 		_ = m.store.Delete(ctx, refreshToken)
 		return "", "", err
 	}

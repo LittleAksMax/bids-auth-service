@@ -1,12 +1,12 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"time"
+
+	"github.com/LittleAksMax/bids-util/env"
 )
 
 type Config struct {
@@ -15,52 +15,40 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
-	Port       string
+	Port       int
 
 	AccessTokenSecret  string
 	RefreshTokenSecret string
 	AccessTokenTTL     time.Duration
 	RefreshTokenTTL    time.Duration
 	ValidationAPIKey   string
+	TokenIssuer        string
+	TokenAudience      string
 
-	RedisHost     string
-	RedisPort     string
-	RedisPassword string
+	PasswordPepper string // Add this field for password pepper
 }
 
 // Load reads environment variables and returns a Config.
 // Required: DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, PORT,
 // ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET, VALIDATION_API_KEY, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 func Load() (*Config, error) {
-	host := os.Getenv("DATABASE_HOST")
-	port := os.Getenv("DATABASE_PORT")
-	user := os.Getenv("DATABASE_USER")
-	pass := os.Getenv("DATABASE_PASSWORD")
-	name := os.Getenv("DATABASE_NAME")
-	appPort := os.Getenv("PORT")
-	if host == "" || port == "" || user == "" || pass == "" || name == "" || appPort == "" {
-		return nil, errors.New("database connection variables are required (host, port, user, password, name, PORT)")
-	}
+	host := env.GetStrFromEnv("DATABASE_HOST")
+	port := env.GetStrFromEnv("DATABASE_PORT")
+	user := env.GetStrFromEnv("DATABASE_USER")
+	pass := env.GetStrFromEnv("DATABASE_PASSWORD")
+	name := env.GetStrFromEnv("DATABASE_NAME")
+	appPort := env.ReadPort("PORT")
 
-	accessSecret := os.Getenv("ACCESS_TOKEN_SECRET")
-	refreshSecret := os.Getenv("REFRESH_TOKEN_SECRET")
-	validationKey := os.Getenv("VALIDATION_API_KEY")
-	if accessSecret == "" || refreshSecret == "" || validationKey == "" {
-		return nil, errors.New("ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET, VALIDATION_API_KEY are required")
-	}
+	accessSecret := env.GetStrFromEnv("ACCESS_TOKEN_SECRET")
+	refreshSecret := env.GetStrFromEnv("REFRESH_TOKEN_SECRET")
+	validationKey := env.GetStrFromEnv("VALIDATION_API_KEY")
+	pepper := env.GetStrFromEnv("PASSWORD_PEPPER")
 
-	accessTTL, err := parseDurationEnv("ACCESS_TOKEN_TTL", "15m")
-	if err != nil {
-		return nil, fmt.Errorf("invalid ACCESS_TOKEN_TTL: %w", err)
-	}
-	refreshTTL, err := parseDurationEnv("REFRESH_TOKEN_TTL", "720h") // 30 days
-	if err != nil {
-		return nil, fmt.Errorf("invalid REFRESH_TOKEN_TTL: %w", err)
-	}
+	accessTTL := env.ParseDurationEnv("ACCESS_TOKEN_TTL")
+	refreshTTL := env.ParseDurationEnv("REFRESH_TOKEN_TTL")
 
-	redisHost := os.Getenv("REDIS_HOST")
-	redisPort := os.Getenv("REDIS_PORT")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
+	tokenIssuer := env.GetStrFromEnv("TOKEN_ISSUER")
+	tokenAudience := env.GetStrFromEnv("TOKEN_AUDIENCE")
 
 	return &Config{
 		DBHost:             host,
@@ -74,9 +62,9 @@ func Load() (*Config, error) {
 		ValidationAPIKey:   validationKey,
 		AccessTokenTTL:     accessTTL,
 		RefreshTokenTTL:    refreshTTL,
-		RedisHost:          redisHost,
-		RedisPort:          redisPort,
-		RedisPassword:      redisPassword,
+		TokenIssuer:        tokenIssuer,
+		TokenAudience:      tokenAudience,
+		PasswordPepper:     pepper,
 	}, nil
 }
 
@@ -86,12 +74,4 @@ func (c *Config) DSN() string {
 	passEsc := url.QueryEscape(c.DBPassword)
 	hostPort := net.JoinHostPort(c.DBHost, c.DBPort)
 	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", userEsc, passEsc, hostPort, c.DBName)
-}
-
-func parseDurationEnv(key, def string) (time.Duration, error) {
-	val := os.Getenv(key)
-	if val == "" {
-		val = def
-	}
-	return time.ParseDuration(val)
 }

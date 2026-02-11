@@ -31,7 +31,7 @@ func RequireAPIKey(apiKey string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			providedKey := r.Header.Get("X-API-Key")
 			if providedKey == "" || providedKey != apiKey {
-				writeJSON(w, http.StatusUnauthorized, apiResponse{Success: false, Error: "invalid or missing API key"})
+				writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid or missing API key"})
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -49,31 +49,31 @@ func ValidateRequest[T any]() func(http.Handler) http.Handler {
 
 			// Decode the request body
 			if err := json.NewDecoder(r.Body).Decode(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: "invalid request body"})
+				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: "invalid request body"})
 				return
 			}
 
 			// Validate required fields
 			if err := validateRequiredFields(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: err.Error()})
+				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate email fields
 			if err := validateEmails(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: err.Error()})
+				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate UUID fields
 			if err := validateUUIDs(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: err.Error()})
+				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate password fields
 			if err := validatePasswords(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Error: err.Error()})
+				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
 				return
 			}
 

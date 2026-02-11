@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/davidr/bids-auth-service/internal/health"
+	"github.com/LittleAksMax/bids-auth-service/internal/health"
 )
 
 const apiKeyHeader = "X-Api-Key"
@@ -38,7 +38,7 @@ func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 			statusCode = http.StatusServiceUnavailable
 		}
 
-		writeJSON(w, statusCode, apiResponse{
+		writeJSON(w, statusCode, Response{
 			Success: true,
 			Data:    statuses,
 		})
@@ -61,7 +61,6 @@ func RegisterRoutes(r chi.Router, c *AuthController, tc *TokensController, healt
 	// Token management routes (API key protected)
 	r.Route("/tokens", func(r chi.Router) {
 		r.Use(RequireAPIKey(tc.Cfg.ValidationAPIKey))
-		r.With(ValidateRequest[ValidateAccessTokenRequest]()).Post("/validate", tc.ValidateAccessToken)
 		r.With(ValidateRequest[InvalidateRefreshTokenRequest]()).Post("/invalidate", tc.InvalidateRefreshToken)
 	})
 }

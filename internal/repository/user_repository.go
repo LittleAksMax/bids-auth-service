@@ -11,6 +11,7 @@ type User struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	Role         string
 }
 
 // UserRepository defines operations for user data access.
@@ -18,6 +19,7 @@ type UserRepository interface {
 	Create(ctx context.Context, username, email, passwordHash string) (userID string, err error)
 	FindByUsername(ctx context.Context, username string) (*User, error)
 	FindByID(ctx context.Context, userID string) (*User, error)
+	FindByEmail(ctx context.Context, email string) (*User, error)
 }
 
 // postgresUserRepository implements UserRepository using PostgreSQL.
@@ -65,6 +67,22 @@ func (r *postgresUserRepository) FindByID(ctx context.Context, userID string) (*
 		userID,
 	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
 
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// FindByEmail retrieves a user by email.
+func (r *postgresUserRepository) FindByEmail(ctx context.Context, email string) (*User, error) {
+	user := &User{}
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, username, email, password_hash FROM users WHERE email = $1`,
+		email,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

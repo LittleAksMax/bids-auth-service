@@ -1,16 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
 
-	"github.com/davidr/bids-auth-service/internal/api"
-	"github.com/davidr/bids-auth-service/internal/cache"
-	"github.com/davidr/bids-auth-service/internal/config"
-	"github.com/davidr/bids-auth-service/internal/db"
+	"github.com/LittleAksMax/bids-auth-service/internal/api"
+	"github.com/LittleAksMax/bids-auth-service/internal/config"
+	"github.com/LittleAksMax/bids-auth-service/internal/db"
 )
 
 const (
@@ -52,14 +52,9 @@ func main() {
 		}
 	}
 
-	refreshStore, err := cache.NewRedisRefreshStore(cfg)
-	if err != nil {
-		log.Fatalf("refresh store error: %v", err)
-	}
+	r := api.NewRouter(pool, cfg)
 
-	r := api.NewRouter(pool, cfg, refreshStore)
-
-	addr := ":" + cfg.Port
+	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("starting server on %s (mode=%s)", addr, mode)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Printf("server stopped: %v", err)

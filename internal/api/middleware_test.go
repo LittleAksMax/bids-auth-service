@@ -437,7 +437,7 @@ func TestValidateRequestMiddleware(t *testing.T) {
 					t.Error("expected validated body but got nil")
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(apiResponse{Success: true, Data: "ok"})
+				json.NewEncoder(w).Encode(Response{Success: true, Data: "ok"})
 			})
 
 			// Apply the validation middleware
@@ -451,7 +451,7 @@ func TestValidateRequestMiddleware(t *testing.T) {
 
 			// Check error message if expected
 			if tt.errorContains != "" {
-				var response apiResponse
+				var response Response
 				if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/davidr/bids-auth-service/internal/config"
-	"github.com/davidr/bids-auth-service/internal/token"
+	"github.com/LittleAksMax/bids-auth-service/internal/config"
+	"github.com/LittleAksMax/bids-auth-service/internal/token"
 )
 
 // TokensController handles token management endpoints (validate, invalidate).

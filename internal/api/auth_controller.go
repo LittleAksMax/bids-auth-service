@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/davidr/bids-auth-service/internal/service"
+	"github.com/LittleAksMax/bids-auth-service/internal/service"
 )
 
 // AuthController houses dependencies for auth/token endpoints.

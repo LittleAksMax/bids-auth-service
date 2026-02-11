@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/davidr/bids-auth-service/internal/config"
+	"github.com/LittleAksMax/bids-auth-service/internal/config"
 )
 
 // DSN constructs a Postgres connection string from environment variables.
