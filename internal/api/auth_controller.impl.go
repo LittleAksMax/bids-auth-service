@@ -16,7 +16,7 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call service layer
-	userID, tokens, err := c.AuthService.Register(r.Context(), body.Username, body.Email, body.Password)
+	user, err := c.authService.Register(r.Context(), body.Username, body.Email, body.Password, body.Role)
 	if err != nil {
 		if errors.Is(err, service.ErrUserExists) {
 			writeJSON(w, http.StatusConflict, Response{Success: false, Error: "username or email already exists"})
@@ -26,12 +26,25 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accessToken, refreshToken, err := c.tokenService.CreateNewTokenPair(r.Context(), user.ID, user.Username, user.Role)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to generate token pair"})
+	}
+
 	writeJSON(w, http.StatusCreated, Response{
 		Success: true,
-		Data: map[string]string{
-			"user_id":       userID,
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+		Data: map[string]map[string]string{
+			"user": {
+				"id":         user.ID.String(),
+				"username":   user.Username,
+				"email":      user.Email,
+				"created_at": user.CreatedAt.String(),
+				"role":       user.Role,
+			},
+			"tokens": {
+				"refresh_token": accessToken,
+				"access_token":  refreshToken,
+			},
 		},
 	})
 }
@@ -44,8 +57,8 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call service layer
-	tokens, err := c.AuthService.Login(r.Context(), body.Username, body.Password)
+	// Obtain user and check password
+	user, err := c.authService.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
 			writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid credentials"})
@@ -55,11 +68,17 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate token pair
+	accessToken, refreshToken, err := c.tokenService.CreateNewTokenPair(r.Context(), user.ID, user.Username, user.Role)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to generate token pair"})
+	}
+
 	writeJSON(w, http.StatusOK, Response{
 		Success: true,
 		Data: map[string]string{
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+			"refresh_token": accessToken,
+			"access_token":  refreshToken,
 		},
 	})
 }
@@ -72,13 +91,24 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call service layer
-	if err := c.AuthService.Logout(r.Context(), body.RefreshToken); err != nil {
+	// Revoke the provided refresh token (idempotent)
+	if err := c.tokenService.Logout(r.Context(), body.RefreshToken); err != nil {
 		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to logout"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{Success: true, Data: "logged out"})
+	// Clear refresh token cookie if present (Path must match where it's set, e.g., /auth/refresh)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/auth/refresh",
+		MaxAge:   0,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Refresh handler exchanges a refresh token for a new token pair.
@@ -89,22 +119,17 @@ func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call service layer
-	tokens, err := c.AuthService.RefreshTokens(r.Context(), body.RefreshToken)
+	accessToken, newRefreshToken, err := c.tokenService.Refresh(r.Context(), body.RefreshToken)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidRefresh) || errors.Is(err, service.ErrRefreshExpired) {
-			writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid or expired refresh token"})
-			return
-		}
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to refresh tokens"})
+		writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid or expired refresh token"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, Response{
 		Success: true,
 		Data: map[string]string{
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+			"refresh_token": newRefreshToken,
+			"access_token":  accessToken,
 		},
 	})
 }

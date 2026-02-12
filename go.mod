@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/LittleAksMax/bids-util v0.0.5 // indirect
+	github.com/LittleAksMax/bids-util v0.0.6-0.20260211175853-40a17c4f2a14 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

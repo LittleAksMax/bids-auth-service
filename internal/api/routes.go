@@ -8,8 +8,6 @@ import (
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
 )
 
-const apiKeyHeader = "X-Api-Key"
-
 // Health handler implementation that checks all registered services.
 // Always returns success=true since the request itself was fulfilled.
 // Individual service health is reported in the data field.
@@ -46,7 +44,7 @@ func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 }
 
 // RegisterRoutes registers all endpoint handlers using the controller methods.
-func RegisterRoutes(r chi.Router, c *AuthController, tc *TokensController, healthCheckers map[string]health.HealthChecker) {
+func RegisterRoutes(r chi.Router, c *AuthController /*tc *TokensController,*/, healthCheckers map[string]health.HealthChecker) {
 	// Health
 	r.Get("/health", Health(healthCheckers))
 
@@ -56,11 +54,5 @@ func RegisterRoutes(r chi.Router, c *AuthController, tc *TokensController, healt
 		r.With(ValidateRequest[LoginRequest]()).Post("/login", c.Login)
 		r.With(ValidateRequest[LogoutRequest]()).Post("/logout", c.Logout)
 		r.With(ValidateRequest[RefreshRequest]()).Post("/refresh", c.Refresh)
-	})
-
-	// Token management routes (API key protected)
-	r.Route("/tokens", func(r chi.Router) {
-		r.Use(RequireAPIKey(tc.Cfg.ValidationAPIKey))
-		r.With(ValidateRequest[InvalidateRefreshTokenRequest]()).Post("/invalidate", tc.InvalidateRefreshToken)
 	})
 }

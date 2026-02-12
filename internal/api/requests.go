@@ -5,11 +5,12 @@ type RegisterRequest struct {
 	Username string `json:"username" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,password"`
+	Role     string `json:"role" validate:"required,password"`
 }
 
 // LoginRequest represents the request body for user login.
 type LoginRequest struct {
-	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required"`
 	Password string `json:"password" validate:"required"`
 }
 
@@ -21,11 +22,6 @@ type LogoutRequest struct {
 // RefreshRequest represents the request body for token refresh.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
-}
-
-// ValidateAccessTokenRequest represents the request body for validating an access token.
-type ValidateAccessTokenRequest struct {
-	AccessToken string `json:"access_token" validate:"required"`
 }
 
 // InvalidateRefreshTokenRequest represents the request body for invalidating a refresh token.
