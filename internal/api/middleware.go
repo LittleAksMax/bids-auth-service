@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/LittleAksMax/bids-util/requests"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -25,20 +26,6 @@ func RegisterMiddleware(r chi.Router) {
 	r.Use(middleware.Recoverer)
 }
 
-// RequireAPIKey is a middleware that validates the X-API-Key header.
-func RequireAPIKey(apiKey string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			providedKey := r.Header.Get("X-API-Key")
-			if providedKey == "" || providedKey != apiKey {
-				writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid or missing API key"})
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
 // ValidateRequest is a generic middleware that validates request body fields.
 // It decodes the JSON body into the provided type T and validates all marked fields.
 func ValidateRequest[T any]() func(http.Handler) http.Handler {
@@ -49,31 +36,37 @@ func ValidateRequest[T any]() func(http.Handler) http.Handler {
 
 			// Decode the request body
 			if err := json.NewDecoder(r.Body).Decode(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: "invalid request body"})
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: "invalid request body"})
 				return
 			}
 
 			// Validate required fields
 			if err := validateRequiredFields(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate email fields
 			if err := validateEmails(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate UUID fields
 			if err := validateUUIDs(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: err.Error()})
 				return
 			}
 
 			// Validate password fields
 			if err := validatePasswords(&reqValue); err != nil {
-				writeJSON(w, http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: err.Error()})
+				return
+			}
+
+			// Validate role fields
+			if err := validateRoles(&reqValue); err != nil {
+				requests.WriteJSON(w, http.StatusBadRequest, requests.APIResponse{Success: false, Error: err.Error()})
 				return
 			}
 
@@ -263,6 +256,56 @@ func validatePasswords(v interface{}) error {
 	return nil
 }
 
+// validateRoles checks if fields marked with validate:"role" contain allowed role values.
+func validateRoles(v interface{}) error {
+	val := reflect.ValueOf(v)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	typ := val.Type()
+
+	var invalidFields []string
+	allowed := map[string]struct{}{
+		"user":  {},
+		"admin": {},
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		fieldValue := val.Field(i)
+
+		// Check if field has validate tag with "role"
+		validateTag := field.Tag.Get("validate")
+		if !strings.Contains(validateTag, "role") {
+			continue
+		}
+
+		// Only validate string fields
+		if fieldValue.Kind() == reflect.String {
+			roleStr := strings.ToLower(strings.TrimSpace(fieldValue.String()))
+			// Skip empty strings - let required validation handle that
+			if roleStr == "" {
+				continue
+			}
+
+			if _, ok := allowed[roleStr]; !ok {
+				jsonTag := field.Tag.Get("json")
+				fieldName := strings.Split(jsonTag, ",")[0]
+				if fieldName == "" {
+					fieldName = field.Name
+				}
+				invalidFields = append(invalidFields, fieldName)
+			}
+		}
+	}
+
+	if len(invalidFields) > 0 {
+		return &RoleValidationError{Fields: invalidFields}
+	}
+
+	return nil
+}
+
 // ValidationError represents validation errors.
 type ValidationError struct {
 	Fields []string
@@ -297,6 +340,15 @@ type PasswordValidationError struct {
 
 func (e *PasswordValidationError) Error() string {
 	return strings.Join(e.Fields, ", ") + " must be at least 8 characters"
+}
+
+// RoleValidationError represents role validation errors.
+type RoleValidationError struct {
+	Fields []string
+}
+
+func (e *RoleValidationError) Error() string {
+	return strings.Join(e.Fields, ", ") + " must be one of: user, admin"
 }
 
 // GetRequestBody retrieves the validated request body from the context.

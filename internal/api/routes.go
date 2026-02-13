@@ -3,12 +3,11 @@ package api
 import (
 	"net/http"
 
+	"github.com/LittleAksMax/bids-util/requests"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
 )
-
-const apiKeyHeader = "X-Api-Key"
 
 // Health handler implementation that checks all registered services.
 // Always returns success=true since the request itself was fulfilled.
@@ -38,7 +37,7 @@ func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 			statusCode = http.StatusServiceUnavailable
 		}
 
-		writeJSON(w, statusCode, Response{
+		requests.WriteJSON(w, statusCode, requests.APIResponse{
 			Success: true,
 			Data:    statuses,
 		})
@@ -46,7 +45,7 @@ func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 }
 
 // RegisterRoutes registers all endpoint handlers using the controller methods.
-func RegisterRoutes(r chi.Router, c *AuthController, tc *TokensController, healthCheckers map[string]health.HealthChecker) {
+func RegisterRoutes(r chi.Router, c *AuthController /*tc *TokensController,*/, healthCheckers map[string]health.HealthChecker) {
 	// Health
 	r.Get("/health", Health(healthCheckers))
 
@@ -56,11 +55,5 @@ func RegisterRoutes(r chi.Router, c *AuthController, tc *TokensController, healt
 		r.With(ValidateRequest[LoginRequest]()).Post("/login", c.Login)
 		r.With(ValidateRequest[LogoutRequest]()).Post("/logout", c.Logout)
 		r.With(ValidateRequest[RefreshRequest]()).Post("/refresh", c.Refresh)
-	})
-
-	// Token management routes (API key protected)
-	r.Route("/tokens", func(r chi.Router) {
-		r.Use(RequireAPIKey(tc.Cfg.ValidationAPIKey))
-		r.With(ValidateRequest[InvalidateRefreshTokenRequest]()).Post("/invalidate", tc.InvalidateRefreshToken)
 	})
 }

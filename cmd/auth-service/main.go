@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/LittleAksMax/bids-util/env"
 	"github.com/joho/godotenv"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/api"
@@ -20,8 +21,9 @@ const (
 
 func main() {
 	// Load development override file BEFORE config parsing if MODE indicates development.
-	mode := os.Getenv("MODE")
+	mode := env.GetStrFromEnv("MODE")
 	if mode != ModeDevelopment && mode != ModeProduction {
+		log.Fatalf("invalid environment variable MODE: %s", mode)
 	}
 	if mode == ModeDevelopment {
 		if err := godotenv.Load(".env.Dev"); err != nil {
@@ -52,7 +54,7 @@ func main() {
 		}
 	}
 
-	r := api.NewRouter(pool, cfg)
+	r := api.NewRouter(pool, cfg, mode == ModeProduction)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("starting server on %s (mode=%s)", addr, mode)

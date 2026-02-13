@@ -3,54 +3,48 @@ package repository
 import (
 	"context"
 	"database/sql"
-)
+	"errors"
 
-// User represents a user entity.
-type User struct {
-	ID           string
-	Username     string
-	Email        string
-	PasswordHash string
-	Role         string
-}
+	"github.com/LittleAksMax/bids-auth-service/internal/contracts"
+	"github.com/google/uuid"
+)
 
 // UserRepository defines operations for user data access.
 type UserRepository interface {
-	Create(ctx context.Context, username, email, passwordHash string) (userID string, err error)
-	FindByUsername(ctx context.Context, username string) (*User, error)
-	FindByID(ctx context.Context, userID string) (*User, error)
-	FindByEmail(ctx context.Context, email string) (*User, error)
+	Create(ctx context.Context, tx *sql.Tx, username, email, role string) (*contracts.User, error)
+	FindByUsername(ctx context.Context, db *sql.DB, username string) (*contracts.User, error)
+	FindByID(ctx context.Context, db *sql.DB, userID uuid.UUID) (*contracts.User, error)
+	FindByEmail(ctx context.Context, db *sql.DB, email string) (*contracts.User, error)
 }
 
 // postgresUserRepository implements UserRepository using PostgreSQL.
 type postgresUserRepository struct {
-	db *sql.DB
 }
 
 // NewUserRepository creates a new Postgres-backed user repository.
-func NewUserRepository(db *sql.DB) UserRepository {
-	return &postgresUserRepository{db: db}
+func NewUserRepository() UserRepository {
+	return &postgresUserRepository{}
 }
 
 // Create inserts a new user and returns the generated ID.
-func (r *postgresUserRepository) Create(ctx context.Context, username, email, passwordHash string) (string, error) {
-	var userID string
-	err := r.db.QueryRowContext(ctx,
-		`INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id`,
-		username, email, passwordHash,
-	).Scan(&userID)
-	return userID, err
+func (r *postgresUserRepository) Create(ctx context.Context, tx *sql.Tx, username, email, role string) (*contracts.User, error) {
+	user := &contracts.User{}
+	err := tx.QueryRowContext(ctx,
+		`INSERT INTO users (username, email, role) VALUES ($1, $2, $3) RETURNING id, username, email, created_at, updated_at, "role"`,
+		username, email, role,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt, &user.Role)
+	return user, err
 }
 
 // FindByUsername retrieves a user by username.
-func (r *postgresUserRepository) FindByUsername(ctx context.Context, username string) (*User, error) {
-	user := &User{}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, username, email, password_hash FROM users WHERE username = $1`,
+func (r *postgresUserRepository) FindByUsername(ctx context.Context, db *sql.DB, username string) (*contracts.User, error) {
+	user := &contracts.User{}
+	err := db.QueryRowContext(ctx,
+		`SELECT id, username, email, created_at, updated_at, role FROM users WHERE username = $1`,
 		username,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
+	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt, &user.Role)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -60,14 +54,14 @@ func (r *postgresUserRepository) FindByUsername(ctx context.Context, username st
 }
 
 // FindByID retrieves a user by ID.
-func (r *postgresUserRepository) FindByID(ctx context.Context, userID string) (*User, error) {
-	user := &User{}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, username, email, password_hash FROM users WHERE id = $1`,
+func (r *postgresUserRepository) FindByID(ctx context.Context, db *sql.DB, userID uuid.UUID) (*contracts.User, error) {
+	user := &contracts.User{}
+	err := db.QueryRowContext(ctx,
+		`SELECT id, username, email, created_at, updated_at, role FROM users WHERE id = $1`,
 		userID,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
+	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt, &user.Role)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -76,14 +70,14 @@ func (r *postgresUserRepository) FindByID(ctx context.Context, userID string) (*
 	return user, nil
 }
 
-// FindByEmail retrieves a user by email.
-func (r *postgresUserRepository) FindByEmail(ctx context.Context, email string) (*User, error) {
-	user := &User{}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, username, email, password_hash FROM users WHERE email = $1`,
+// FindByEmail retrieves a user by email
+func (r *postgresUserRepository) FindByEmail(ctx context.Context, db *sql.DB, email string) (*contracts.User, error) {
+	user := &contracts.User{}
+	err := db.QueryRowContext(ctx,
+		`SELECT id, username, email, created_at, updated_at, role FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
-	if err == sql.ErrNoRows {
+	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt, &user.Role)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

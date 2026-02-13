@@ -5,33 +5,50 @@ import (
 	"net/http"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/service"
+	"github.com/LittleAksMax/bids-util/requests"
 )
 
 // Register handler creates a new user account.
 func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	body := GetRequestBody[RegisterRequest](r)
 	if body == nil {
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to parse request"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
 
 	// Call service layer
-	userID, tokens, err := c.AuthService.Register(r.Context(), body.Username, body.Email, body.Password)
+	user, err := c.authService.Register(r.Context(), body.Username, body.Email, body.Password, body.Role)
 	if err != nil {
 		if errors.Is(err, service.ErrUserExists) {
-			writeJSON(w, http.StatusConflict, Response{Success: false, Error: "username or email already exists"})
+			requests.WriteJSON(w, http.StatusConflict, requests.APIResponse{Success: false, Error: "username or email already exists"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to register user"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to register user"})
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, Response{
+	tokenPair, err := c.tokenService.CreateNewTokenPair(r.Context(), user.ID, user.Username, user.Role)
+	if err != nil || tokenPair == nil {
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to generate token pair"})
+	}
+
+	// Set refresh token cookie (for browser clients)
+	http.SetCookie(w, c.cookieService.CreateSetAuthCookie(tokenPair.RefreshToken))
+
+	requests.WriteJSON(w, http.StatusCreated, requests.APIResponse{
 		Success: true,
-		Data: map[string]string{
-			"user_id":       userID,
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+		Data: map[string]map[string]string{
+			"user": {
+				"id":         user.ID.String(),
+				"username":   user.Username,
+				"email":      user.Email,
+				"created_at": user.CreatedAt.String(),
+				"role":       user.Role,
+			},
+			"tokens": {
+				"refresh_token": tokenPair.RefreshToken,
+				"access_token":  tokenPair.AccessToken,
+			},
 		},
 	})
 }
@@ -40,26 +57,35 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	body := GetRequestBody[LoginRequest](r)
 	if body == nil {
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to parse request"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
 
-	// Call service layer
-	tokens, err := c.AuthService.Login(r.Context(), body.Username, body.Password)
+	// Obtain user and check password
+	user, err := c.authService.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
-			writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid credentials"})
+			requests.WriteJSON(w, http.StatusUnauthorized, requests.APIResponse{Success: false, Error: "invalid credentials"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "login failed"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "login failed"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{
+	// Generate token pair
+	tokenPair, err := c.tokenService.CreateNewTokenPair(r.Context(), user.ID, user.Username, user.Role)
+	if err != nil || tokenPair == nil {
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to generate token pair"})
+	}
+
+	// Set refresh token cookie (for browser clients)
+	http.SetCookie(w, c.cookieService.CreateSetAuthCookie(tokenPair.RefreshToken))
+
+	requests.WriteJSON(w, http.StatusOK, requests.APIResponse{
 		Success: true,
 		Data: map[string]string{
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+			"refresh_token": tokenPair.RefreshToken,
+			"access_token":  tokenPair.AccessToken,
 		},
 	})
 }
@@ -68,43 +94,41 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	body := GetRequestBody[LogoutRequest](r)
 	if body == nil {
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to parse request"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
 
-	// Call service layer
-	if err := c.AuthService.Logout(r.Context(), body.RefreshToken); err != nil {
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to logout"})
+	// Revoke the provided refresh token (idempotent)
+	if err := c.tokenService.Logout(r.Context(), body.RefreshToken); err != nil {
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to logout"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{Success: true, Data: "logged out"})
+	// Clear refresh token cookie if present
+	http.SetCookie(w, c.cookieService.CreateClearAuthCookie())
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Refresh handler exchanges a refresh token for a new token pair.
 func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
 	body := GetRequestBody[RefreshRequest](r)
 	if body == nil {
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to parse request"})
+		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
 	}
 
-	// Call service layer
-	tokens, err := c.AuthService.RefreshTokens(r.Context(), body.RefreshToken)
-	if err != nil {
-		if errors.Is(err, service.ErrInvalidRefresh) || errors.Is(err, service.ErrRefreshExpired) {
-			writeJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "invalid or expired refresh token"})
-			return
-		}
-		writeJSON(w, http.StatusInternalServerError, Response{Success: false, Error: "failed to refresh tokens"})
+	newTokenPair, err := c.tokenService.Refresh(r.Context(), body.RefreshToken)
+	if err != nil || newTokenPair == nil {
+		requests.WriteJSON(w, http.StatusUnauthorized, requests.APIResponse{Success: false, Error: "invalid or expired refresh token"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{
+	requests.WriteJSON(w, http.StatusOK, requests.APIResponse{
 		Success: true,
 		Data: map[string]string{
-			"refresh_token": tokens.RefreshToken,
-			"access_token":  tokens.AccessToken,
+			"refresh_token": newTokenPair.RefreshToken,
+			"access_token":  newTokenPair.AccessToken,
 		},
 	})
 }
