@@ -5,7 +5,7 @@ type RegisterRequest struct {
 	Username string `json:"username" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,password"`
-	Role     string `json:"role" validate:"required,password"`
+	Role     string `json:"role" validate:"required,role"`
 }
 
 // LoginRequest represents the request body for user login.

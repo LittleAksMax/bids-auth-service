@@ -16,18 +16,10 @@ var (
 	ErrUserExists         = errors.New("username or email already exists")
 )
 
-// TokenPair represents an access and refresh token pair.
-type TokenPair struct {
-	AccessToken  string
-	RefreshToken string
-}
-
 // AuthService handles authentication business logic.
 type AuthService interface {
 	Register(ctx context.Context, username, email, password, role string) (*contracts.UserDTO, error)
 	Login(ctx context.Context, email, password string) (*contracts.UserDTO, error)
-	//Logout(ctx context.Context, refreshToken string) error
-	//RefreshTokens(ctx context.Context, refreshToken string) (*TokenPair, error)
 }
 
 // authService implements AuthService.
@@ -69,6 +61,10 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 	// Ensure transaction is rolled back if any step fails (safe to do if commit has already happened)
 	defer func() {
 		if err := tx.Rollback(); err != nil {
+			if errors.Is(err, sql.ErrTxDone) {
+				// already committed or rolled back; no-op
+				return
+			}
 			log.Printf("couldn't rollback transaction: %v\n", err)
 		}
 	}()
@@ -80,7 +76,7 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 	}
 
 	// Store password credential
-	hash, salt, err := passwords.HashPassword(password, s.pepper, passwords.DefaultParams)
+	salt, hash, err := passwords.HashPassword(password, s.pepper, passwords.DefaultParams)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +112,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (*contr
 	}
 
 	// Verify password
-	ok, err := passwords.VerifyPassword(password, s.pepper, creds.PasswordSalt, passwords.DefaultParams)
+	ok, err := passwords.VerifyPassword(password, s.pepper, creds.PasswordSalt, creds.PasswordHash, passwords.DefaultParams)
 	if err != nil {
 		return nil, err
 	}

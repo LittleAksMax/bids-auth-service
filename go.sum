@@ -1,7 +1,5 @@
-github.com/LittleAksMax/bids-util v0.0.5 h1:ptJzoYPNTF+X8rWA3doMSckFTM/NBwCkx6jv2LXxf6I=
-github.com/LittleAksMax/bids-util v0.0.5/go.mod h1:SrRKuc2Eoe7eyca7OPkM7ZufeRFpYkxos8B6nix17Qk=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260211175853-40a17c4f2a14 h1:6TqIVOu4luAyT7U0Sj2srtHOyKEF48f8gokGIryITlE=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260211175853-40a17c4f2a14/go.mod h1:SrRKuc2Eoe7eyca7OPkM7ZufeRFpYkxos8B6nix17Qk=
+github.com/LittleAksMax/bids-util v0.0.6-0.20260213103441-4022a334c3cd h1:unGiSGNOctqrp9HO9lkCTYOMEN0ydYpM52W2irKN2r8=
+github.com/LittleAksMax/bids-util v0.0.6-0.20260213103441-4022a334c3cd/go.mod h1:VRn7XrcSwPuR0dsrbTYIHmsw6H/z8h9sMcql0JRanFw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

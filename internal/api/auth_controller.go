@@ -6,14 +6,16 @@ import (
 
 // AuthController houses dependencies for auth/token endpoints.
 type AuthController struct {
-	authService  service.AuthService
-	tokenService service.TokenService
+	authService   service.AuthService
+	tokenService  service.TokenService
+	cookieService service.CookieService
 }
 
 // NewAuthController constructs an AuthController.
-func NewAuthController(authService service.AuthService, tokenService service.TokenService) *AuthController {
+func NewAuthController(authService service.AuthService, tokenService service.TokenService, cookieService service.CookieService) *AuthController {
 	return &AuthController{
-		authService:  authService,
-		tokenService: tokenService,
+		authService:   authService,
+		tokenService:  tokenService,
+		cookieService: cookieService,
 	}
 }

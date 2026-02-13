@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/LittleAksMax/bids-util/requests"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
@@ -36,7 +37,7 @@ func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 			statusCode = http.StatusServiceUnavailable
 		}
 
-		writeJSON(w, statusCode, Response{
+		requests.WriteJSON(w, statusCode, requests.APIResponse{
 			Success: true,
 			Data:    statuses,
 		})

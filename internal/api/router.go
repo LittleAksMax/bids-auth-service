@@ -13,7 +13,7 @@ import (
 )
 
 // NewRouter constructs the main API router by wiring middleware and routes defined elsewhere.
-func NewRouter(pool *sql.DB, cfg *config.Config) http.Handler {
+func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 	r := chi.NewRouter()
 
 	RegisterMiddleware(r)
@@ -32,8 +32,16 @@ func NewRouter(pool *sql.DB, cfg *config.Config) http.Handler {
 		cfg.AccessTokenSecret, cfg.RefreshTokenSecret,
 		cfg.AccessTokenTTL, cfg.RefreshTokenTTL, cfg.TokenIssuer, cfg.TokenAudience)
 
+	// Initialise cookie management services
+	cookieService := service.NewCookieService(
+		"/auth/refresh",
+		"refresh_token",
+		int(cfg.RefreshTokenTTL.Seconds()),
+		http.SameSiteLaxMode,
+		secureMode)
+
 	// Initialise controllers
-	authController := NewAuthController(authService, tokenService)
+	authController := NewAuthController(authService, tokenService, cookieService)
 
 	// Create health checkers map
 	healthCheckers := map[string]health.HealthChecker{
