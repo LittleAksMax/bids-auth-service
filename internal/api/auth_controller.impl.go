@@ -42,6 +42,7 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 				"id":         user.ID.String(),
 				"username":   user.Username,
 				"email":      user.Email,
+				"updated_at": user.UpdatedAt.String(),
 				"created_at": user.CreatedAt.String(),
 				"role":       user.Role,
 			},
@@ -83,9 +84,19 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 
 	requests.WriteJSON(w, http.StatusOK, requests.APIResponse{
 		Success: true,
-		Data: map[string]string{
-			"refresh_token": tokenPair.RefreshToken,
-			"access_token":  tokenPair.AccessToken,
+		Data: map[string]map[string]string{
+			"user": {
+				"id":         user.ID.String(),
+				"username":   user.Username,
+				"email":      user.Email,
+				"updated_at": user.UpdatedAt.String(),
+				"created_at": user.CreatedAt.String(),
+				"role":       user.Role,
+			},
+			"tokens": {
+				"refresh_token": tokenPair.RefreshToken,
+				"access_token":  tokenPair.AccessToken,
+			},
 		},
 	})
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/LittleAksMax/bids-util/requests"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 )
 
@@ -24,6 +25,34 @@ func RegisterMiddleware(r chi.Router) {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+}
+
+// ApplyCORS configures CORS with an allow-all default or a restricted list of origins.
+// Pass the ALLOWED_ORIGINS values from config. Use "*" to allow all.
+func ApplyCORS(r chi.Router, allowedOrigins []string) {
+	allowAll := false
+	for _, o := range allowedOrigins {
+		if strings.TrimSpace(o) == "*" {
+			allowAll = true
+			break
+		}
+	}
+
+	c := cors.Handler(cors.Options{
+		AllowedOrigins: func() []string {
+			if allowAll {
+				return []string{"*"}
+			}
+			return allowedOrigins
+		}(),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Auth-Claims", "X-Auth-Ts", "X-Auth-Sig"},
+		ExposedHeaders:   []string{"Set-Cookie"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	})
+
+	r.Use(c)
 }
 
 // ValidateRequest is a generic middleware that validates request body fields.

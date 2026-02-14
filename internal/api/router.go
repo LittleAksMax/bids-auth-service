@@ -17,6 +17,7 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 	r := chi.NewRouter()
 
 	RegisterMiddleware(r)
+	ApplyCORS(r, cfg.AllowedOrigins)
 
 	// Initialise authentication layers
 	userRepo := repository.NewUserRepository()
@@ -37,7 +38,7 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 		"/auth/refresh",
 		"refresh_token",
 		int(cfg.RefreshTokenTTL.Seconds()),
-		http.SameSiteLaxMode,
+		http.SameSiteStrictMode, // NOTE: might be too strict
 		secureMode)
 
 	// Initialise controllers
@@ -48,7 +49,7 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 		"database": health.NewDBHealthChecker(pool),
 	}
 
-	RegisterRoutes(r, authController /*tokensController,*/, healthCheckers)
+	RegisterRoutes(r, authController, healthCheckers)
 
 	return r
 }
