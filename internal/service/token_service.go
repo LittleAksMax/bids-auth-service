@@ -11,8 +11,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/LittleAksMax/bids-auth-service/internal/contracts"
 	"github.com/LittleAksMax/bids-auth-service/internal/repository"
+	"github.com/LittleAksMax/bids-util/requests"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -60,7 +60,7 @@ func (s *tokenService) generateAccessToken(userID uuid.UUID, username, role stri
 	now := time.Now()
 	jti := uuid.New().String()
 
-	claims := contracts.Claims{
+	claims := requests.Claims{
 		Role: role,
 		Name: username,
 		RegisteredClaims: jwt.RegisteredClaims{

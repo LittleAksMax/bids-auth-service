@@ -10,6 +10,7 @@ import (
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
 	"github.com/LittleAksMax/bids-auth-service/internal/repository"
 	"github.com/LittleAksMax/bids-auth-service/internal/service"
+	"github.com/LittleAksMax/bids-util/requests"
 )
 
 // NewRouter constructs the main API router by wiring middleware and routes defined elsewhere.
@@ -17,6 +18,16 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 	r := chi.NewRouter()
 
 	RegisterMiddleware(r)
+	
+	requests.ApplyCORS(
+		r,
+		cfg.AllowedOrigins,
+		[]string{"GET", "POST", "PUT", "DELETE"},
+		[]string{"Accept", "Authorization", "Content-Type", "X-Auth-Claims", "X-Auth-Ts", "X-Auth-Sig"},
+		[]string{"Set-Cookie"},
+		true,
+		300,
+	)
 
 	// Initialise authentication layers
 	userRepo := repository.NewUserRepository()
@@ -37,7 +48,7 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 		"/auth/refresh",
 		"refresh_token",
 		int(cfg.RefreshTokenTTL.Seconds()),
-		http.SameSiteLaxMode,
+		http.SameSiteStrictMode,
 		secureMode)
 
 	// Initialise controllers
@@ -48,7 +59,7 @@ func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 		"database": health.NewDBHealthChecker(pool),
 	}
 
-	RegisterRoutes(r, authController /*tokensController,*/, healthCheckers)
+	RegisterRoutes(r, authController, healthCheckers)
 
 	return r
 }

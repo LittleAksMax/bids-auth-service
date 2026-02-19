@@ -26,6 +26,8 @@ type Config struct {
 	TokenAudience      string
 
 	PasswordPepper string // Add this field for password pepper
+
+	AllowedOrigins []string // CORS allowed origins, read from ALLOWED_ORIGINS (comma-separated)
 }
 
 // Load reads environment variables and returns a Config.
@@ -44,11 +46,14 @@ func Load() (*Config, error) {
 	validationKey := env.GetStrFromEnv("VALIDATION_API_KEY")
 	pepper := env.GetStrFromEnv("PASSWORD_PEPPER")
 
+	// Token settings
 	accessTTL := env.ParseDurationEnv("ACCESS_TOKEN_TTL")
 	refreshTTL := env.ParseDurationEnv("REFRESH_TOKEN_TTL")
-
 	tokenIssuer := env.GetStrFromEnv("TOKEN_ISSUER")
 	tokenAudience := env.GetStrFromEnv("TOKEN_AUDIENCE")
+
+	// CORS settings
+	allowedOrigins := env.GetStrListFromEnv("ALLOWED_ORIGINS")
 
 	return &Config{
 		DBHost:             host,
@@ -65,6 +70,7 @@ func Load() (*Config, error) {
 		TokenIssuer:        tokenIssuer,
 		TokenAudience:      tokenAudience,
 		PasswordPepper:     pepper,
+		AllowedOrigins:     allowedOrigins,
 	}, nil
 }
 
