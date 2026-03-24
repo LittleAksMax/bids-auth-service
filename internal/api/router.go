@@ -16,9 +16,9 @@ import (
 // NewRouter constructs the main API router by wiring middleware and routes defined elsewhere.
 func NewRouter(pool *sql.DB, cfg *config.Config, secureMode bool) http.Handler {
 	r := chi.NewRouter()
-
-	RegisterMiddleware(r)
 	
+	requests.RegisterMiddleware(r)
+
 	requests.ApplyCORS(
 		r,
 		cfg.AllowedOrigins,

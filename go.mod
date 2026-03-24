@@ -5,7 +5,6 @@ go 1.24.11
 toolchain go1.24.12
 
 require (
-	github.com/LittleAksMax/bids-util v0.0.6-0.20260218173913-01f4995c0cfd
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -16,6 +15,7 @@ require (
 )
 
 require (
+	github.com/LittleAksMax/bids-util v0.0.6-0.20260323213803-9dde793d34c8 // indirect
 	github.com/go-chi/cors v1.2.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

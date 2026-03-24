@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/LittleAksMax/bids-util/requests"
+	"github.com/LittleAksMax/bids-util/validation"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
@@ -50,10 +51,17 @@ func RegisterRoutes(r chi.Router, c *AuthController /*tc *TokensController,*/, h
 	r.Get("/health", Health(healthCheckers))
 
 	// Auth routes
+	authValidationFuncs := []func(any) error{
+		validation.ValidateRequiredFields,
+		validation.ValidateUUIDs,
+		validation.ValidateEmails,
+		validation.ValidatePasswords,
+		validation.ValidateRoles,
+	}
 	r.Route("/auth", func(r chi.Router) {
-		r.With(ValidateRequest[RegisterRequest]()).Post("/register", c.Register)
-		r.With(ValidateRequest[LoginRequest]()).Post("/login", c.Login)
-		r.With(ValidateRequest[LogoutRequest]()).Post("/logout", c.Logout)
-		r.With(ValidateRequest[RefreshRequest]()).Post("/refresh", c.Refresh)
+		r.With(requests.ValidateRequest[RegisterRequest](authValidationFuncs)).Post("/register", c.Register)
+		r.With(requests.ValidateRequest[LoginRequest](authValidationFuncs)).Post("/login", c.Login)
+		r.With(requests.ValidateRequest[LogoutRequest](authValidationFuncs)).Post("/logout", c.Logout)
+		r.With(requests.ValidateRequest[RefreshRequest](authValidationFuncs)).Post("/refresh", c.Refresh)
 	})
 }

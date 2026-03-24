@@ -22,7 +22,7 @@ func (cs *cookieService) CreateSetAuthCookie(refreshToken string) *http.Cookie {
 		Path:     cs.refreshPath,
 		MaxAge:   cs.refreshTTL,
 		HttpOnly: true,
-		Secure:   cs.secureMode, // TODO: set based on environment
+		Secure:   cs.secureMode,
 		SameSite: cs.mode,
 	}
 }

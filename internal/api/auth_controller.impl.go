@@ -10,7 +10,7 @@ import (
 
 // Register handler creates a new user account.
 func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
-	body := GetRequestBody[RegisterRequest](r)
+	body := requests.GetRequestBody[RegisterRequest](r)
 	if body == nil {
 		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
@@ -56,7 +56,7 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 
 // Login handler authenticates a user and returns both tokens.
 func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
-	body := GetRequestBody[LoginRequest](r)
+	body := requests.GetRequestBody[LoginRequest](r)
 	if body == nil {
 		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
@@ -103,7 +103,7 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 
 // Logout handler invalidates the refresh token.
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
-	body := GetRequestBody[LogoutRequest](r)
+	body := requests.GetRequestBody[LogoutRequest](r)
 	if body == nil {
 		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
@@ -123,7 +123,7 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 
 // Refresh handler exchanges a refresh token for a new token pair.
 func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
-	body := GetRequestBody[RefreshRequest](r)
+	body := requests.GetRequestBody[RefreshRequest](r)
 	if body == nil {
 		requests.WriteJSON(w, http.StatusInternalServerError, requests.APIResponse{Success: false, Error: "failed to parse request"})
 		return
