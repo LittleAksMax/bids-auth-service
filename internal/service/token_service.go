@@ -232,7 +232,7 @@ func (s *tokenService) Logout(ctx context.Context, refreshToken string) error {
 	return s.refreshTokenRepo.Revoke(ctx, s.pool, existing.TokenID)
 }
 
-// HashRefreshToken computes HMAC-SHA256 hash of the refresh token using the refresh secret.
+// hashRefreshToken computes HMAC-SHA256 hash of the refresh token using the refresh secret.
 func (s *tokenService) hashRefreshToken(token string) string {
 	h := hmac.New(sha256.New, s.refreshSecret)
 	h.Write([]byte(token))

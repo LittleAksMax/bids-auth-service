@@ -1,9 +1,3 @@
-github.com/LittleAksMax/bids-util v0.0.0-20260330192020-7dea0e5bd110 h1:WIitO9X2wouEJWfkZQh1+zjHS5bD1ilffbFeHHRCz7k=
-github.com/LittleAksMax/bids-util v0.0.0-20260330192020-7dea0e5bd110/go.mod h1:8Hup3ATpBOUX8de/nALAVS/DgovuZJfgbzFmR2Ic6YI=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260214170252-378b9589d21b h1:bxiqzUaFOyf6NabQfVkPWLA9m4frlLjbli6zZRDSnYE=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260214170252-378b9589d21b/go.mod h1:tn/An06/EE00vfOmEmuB6ti8D44On9uf06uGiI6IUH4=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260218173913-01f4995c0cfd h1:wJWh1NDPSB4BBVlbLuMc9m3HPdp1TrnN0byOd2HwbJI=
-github.com/LittleAksMax/bids-util v0.0.6-0.20260218173913-01f4995c0cfd/go.mod h1:8Hup3ATpBOUX8de/nALAVS/DgovuZJfgbzFmR2Ic6YI=
 github.com/LittleAksMax/bids-util v1.0.0 h1:pbvH8h3eYpee6fyPcP8puGFifza6XSkb7CWciab5whU=
 github.com/LittleAksMax/bids-util v1.0.0/go.mod h1:8Hup3ATpBOUX8de/nALAVS/DgovuZJfgbzFmR2Ic6YI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

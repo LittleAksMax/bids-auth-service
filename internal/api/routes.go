@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/LittleAksMax/bids-util/requests"
+	"github.com/LittleAksMax/bids-util/validation"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/LittleAksMax/bids-auth-service/internal/health"
@@ -14,19 +15,19 @@ import (
 // Individual service health is reported in the data field.
 func Health(checkers map[string]health.HealthChecker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		statuses := make(map[string]interface{})
+		statuses := make(HealthResponseData)
 		allHealthy := true
 
 		for name, checker := range checkers {
 			if err := checker.HealthCheck(r.Context()); err != nil {
-				statuses[name] = map[string]interface{}{
-					"status": "unhealthy",
-					"error":  err.Error(),
+				statuses[name] = HealthServiceStatusResponse{
+					Status: "unhealthy",
+					Error:  err.Error(),
 				}
 				allHealthy = false
 			} else {
-				statuses[name] = map[string]interface{}{
-					"status": "healthy",
+				statuses[name] = HealthServiceStatusResponse{
+					Status: "healthy",
 				}
 			}
 		}
@@ -49,11 +50,19 @@ func RegisterRoutes(r chi.Router, c *AuthController /*tc *TokensController,*/, h
 	// Health
 	r.Get("/health", Health(healthCheckers))
 
+	validationFuncs := []func(any) error{
+		validation.ValidateRequiredFields,
+		validation.ValidateUUIDs,
+		validation.ValidatePasswords,
+		validation.ValidateEmails,
+		validation.ValidateRoles,
+	}
+
 	// Auth routes
 	r.Route("/auth", func(r chi.Router) {
-		r.With(ValidateRequest[RegisterRequest]()).Post("/register", c.Register)
-		r.With(ValidateRequest[LoginRequest]()).Post("/login", c.Login)
-		r.With(ValidateRequest[LogoutRequest]()).Post("/logout", c.Logout)
-		r.With(ValidateRequest[RefreshRequest]()).Post("/refresh", c.Refresh)
+		r.With(requests.ValidateRequest[RegisterRequest](validationFuncs)).Post("/register", c.Register)
+		r.With(requests.ValidateRequest[LoginRequest](validationFuncs)).Post("/login", c.Login)
+		r.With(requests.ValidateRequest[LogoutRequest](validationFuncs)).Post("/logout", c.Logout)
+		r.With(requests.ValidateRequest[RefreshRequest](validationFuncs)).Post("/refresh", c.Refresh)
 	})
 }

@@ -7,6 +7,7 @@ RUN go mod download
 
 COPY internal/ internal/
 COPY ["cmd/", "cmd/"]
+COPY migrations/ migrations/
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o auth-service ./cmd/auth-service
@@ -17,6 +18,7 @@ WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/auth-service .
+COPY --from=builder /app/migrations ./migrations
 
 ENV MODE=production
 ENV PORT=8080
@@ -26,4 +28,3 @@ EXPOSE 8080
 
 # Run the application
 CMD ["./auth-service"]
-

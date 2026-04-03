@@ -1,134 +1,67 @@
 # Auth Service
 
-Minimal Go auth service using Chi router, Postgres (pgx), JWT tokens, and goose migrations.
+## Architecture
+- `internal/api`: router setup, middleware, request structs, and HTTP handlers.
+- `internal/service`: registration, login, token rotation, logout, and cookie handling.
+- `internal/repository`: Postgres access for users, password credentials, and refresh tokens.
+- `internal/contracts`: shared domain models and DTOs.
+- `internal/db`: database connection and migration runner.
+- `internal/health`: health checks.
+- `internal/config`: environment loading and DSN construction.
 
-## Environment Variables
+## Environment
 
-Use `.env.Dev` for local development overrides and a generic `.env` for shared defaults. Required variables:
-
-```
-MODE=development            # development | production
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=authuser
-DATABASE_PASSWORD=DevPass123!
-DATABASE_NAME=auth_db
-ACCESS_TOKEN_SECRET=your-secret-key-change-me
-REFRESH_TOKEN_SECRET=your-refresh-secret-key-change-me
-ACCESS_TOKEN_TTL=15m        # e.g., 15m, 1h
-REFRESH_TOKEN_TTL=168h      # e.g., 168h (7 days)
-PORT=8082                   # HTTP listen port
-```
-
-`.env.Dev` is loaded first when `MODE=development`, then `.env` as a fallback.
+Required variables are documented in `.env.example`. You must also specify a `MODE` environment variable with value
+`development` or `production`.
 
 ## Migrations
-In development and test modes migrations run automatically at startup. For manual control:
+
+Migrations run automatically. For manual runs:
 
 ```bash
-# Create a new migration
 go run github.com/pressly/goose/v3/cmd/goose@latest create <migration_name> sql
-
-# Run migrations up
 go run github.com/pressly/goose/v3/cmd/goose@latest -dir ./migrations postgres "<connection_string>" up
-
-# Rollback migrations
 go run github.com/pressly/goose/v3/cmd/goose@latest -dir ./migrations postgres "<connection_string>" down
 ```
 
-## Running
+## Endpoints
+Handlers return `requests.APIResponse` unless noted otherwise. The auth handlers currently build their payloads inline rather than through dedicated response structs.
 
-```bash
-MODE=development go run ./cmd/auth-service
-```
+- `/health`
+  - `GET` - return service health.
+  - `GET`, input `none`, output `requests.APIResponse`
+- `/auth`
+  - `/register`
+    - `POST` - create a user and issue a token pair.
+    - `POST`, input `RegisterRequest`, output `requests.APIResponse`
+  - `/login`
+    - `POST` - authenticate a user and issue a token pair.
+    - `POST`, input `LoginRequest`, output `requests.APIResponse`
+  - `/logout`
+    - `POST` - revoke the supplied refresh token.
+    - `POST`, input `LogoutRequest`, output `none` (`204 No Content`)
+  - `/refresh`
+    - `POST` - rotate a refresh token and return a new pair.
+    - `POST`, input `RefreshRequest`, output `requests.APIResponse`
 
-## API Endpoints
+## Database
+Entities:
 
-### Health Check
-```bash
-curl http://localhost:8082/health
-```
+- `users(id, username, email, created_at, updated_at, role)`
+- `password_credentials(user_id, password_hash, password_salt)`
+- `refresh_tokens(token_id, user_id, token_hash, issued_at, expires_at, revoked_at, replaced_by_token_id)`
 
-### Register a New User
-```bash
-curl -X POST http://localhost:8082/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_doe",
-    "email": "john@example.com",
-    "password": "SecurePassword123!"
-  }'
-```
+Relations:
 
-### Login
-```bash
-curl -X POST http://localhost:8082/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_doe",
-    "password": "SecurePassword123!"
-  }'
-```
-Returns both `refresh_token` and `access_token`.
-
-### Refresh Tokens
-```bash
-curl -X POST http://localhost:8082/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "<your_refresh_token>"
-  }'
-```
-Returns a new token pair (`refresh_token` and `access_token`). The old refresh token is invalidated.
-
-### Logout
-```bash
-curl -X POST http://localhost:8082/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "<your_refresh_token>"
-  }'
-```
-Invalidates the refresh token in the database.
-
-### Validate Access Token (API Key Protected)
-```bash
-curl -X POST http://localhost:8082/tokens/validate \
-  -H "Content-Type: application/json" \
-  -H "X-Api-Key: <your_validation_api_key>" \
-  -d '{
-    "access_token": "<jwt_access_token>"
-  }'
-```
-Validates an access token and returns its claims (user_id, expires_at, issued_at). Requires `X-API-Key` header with the `VALIDATION_API_KEY` from environment.
-
-### Invalidate Refresh Token (API Key Protected)
-```bash
-curl -X POST http://localhost:8082/tokens/invalidate \
-  -H "Content-Type: application/json" \
-  -H "X-Api-Key: <your_validation_api_key>" \
-  -d '{
-    "refresh_token": "<refresh_token_to_invalidate>"
-  }'
-```
-Invalidates a specific refresh token in the database. Requires `X-Api-Key` header. Useful for admin operations or security purposes.
-
-## Architecture
-
-- **Router**: Chi router with routes defined in `internal/api/routes.go`
-- **Controllers**: 
-  - Auth endpoints in `internal/api/auth_controller.impl.go`
-  - Token management endpoints in `internal/api/tokens_controller.impl.go`
-- **Token Management**: JWT access tokens and random refresh tokens managed by `internal/token/manager.go`
-- **Database**: PostgreSQL for user accounts with bcrypt password hashing
-- **Migrations**: Goose for schema versioning
-
-
+- `(password_credentials.user_id, users.id)`
+- `(refresh_tokens.user_id, users.id)`
+- `(refresh_tokens.replaced_by_token_id, refresh_tokens.token_id)`
 
 ## Notes
-- Access tokens are short-lived JWTs (default: 15 minutes)
-- Refresh tokens are long-lived random tokens stored in the database (default: 7 days)
-- Passwords are hashed using bcrypt
-- In development mode, migrations run automatically at startup
-- All validation (required fields, email format, password strength) handled by middleware
-- Input normalization (trimming, lowercasing emails) handled at service layer
+- Access tokens are short-lived JWTs.
+- Refresh tokens are stored as hashes in the database.
+- Register and login also set the refresh token as an HTTP cookie.
+- Creating a new token pair revokes any existing active refresh tokens for that user.
+- Request validation is handled in `internal/api/middleware.go`.
+- Role validation applies basic normalisation before allowed-value checks.
+- In development and test mode, migrations run at start-up.

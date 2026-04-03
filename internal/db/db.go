@@ -16,6 +16,7 @@ func Connect(dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Pool settings
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)
