@@ -1,5 +1,7 @@
 # Build stage
-FROM golang:alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+
+ARG TARGETARCH
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -10,7 +12,7 @@ COPY ["cmd/", "cmd/"]
 COPY migrations/ migrations/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o auth-service ./cmd/auth-service
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -installsuffix cgo -o auth-service ./cmd/auth-service
 
 FROM gcr.io/distroless/base-debian12
 
